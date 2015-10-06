@@ -111,6 +111,7 @@ func main() {
 					req.URL.Path = path.Join(config.static.path, root, req.URL.Path)
 					req.Host = config.static.address
 					req.URL.Host = config.static.address
+					req.Header.Del("Cookie")
 				} else {
 					req.URL.Host = root + kubernetesSuffix
 				}

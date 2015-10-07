@@ -25,8 +25,8 @@ var config struct {
 	}
 
 	static struct {
-		enable        bool
-		address, path string
+		enable             bool
+		scheme, host, path string
 	}
 }
 
@@ -37,7 +37,8 @@ func init() {
 	flag.StringVar(&config.kubernetes.dnsDomain, "kubernetes-dns-domain", "cluster.local", "Kubernetes DNS domain")
 	flag.StringVar(&config.kubernetes.namespace, "kubernetes-namespace", "default", "Kubernetes namespace to server")
 	flag.BoolVar(&config.static.enable, "static", false, "enable static proxy")
-	flag.StringVar(&config.static.address, "static-address", "", "static address")
+	flag.StringVar(&config.static.scheme, "static-scheme", "http", "static scheme")
+	flag.StringVar(&config.static.host, "static-host", "", "static host")
 	flag.StringVar(&config.static.path, "static-path", "/", "static path")
 	flag.StringVar(&config.routesFilename, "routes", "", "path to a routes file")
 }
@@ -87,12 +88,15 @@ func main() {
 
 	// Build the reverse proxy HTTP handler.
 	reverseProxy := &httputil.ReverseProxy{
+		Transport: &http.Transport{
+			MaxIdleConnsPerHost: 8,
+		},
 		Director: func(req *http.Request) {
-			req.URL.Scheme = "http"
 
 			// First check against the domain suffixes.
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
+					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
 					return
 				}
@@ -108,11 +112,19 @@ func main() {
 				// Check if the static proxy is enabled and the director-returned root
 				// is a path prefix.
 				if config.static.enable && strings.HasPrefix(root, "/") {
+
+					// Set the URL scheme, host, and path.
+					req.URL.Scheme = config.static.scheme
+					req.URL.Host = config.static.host
 					req.URL.Path = path.Join(config.static.path, root, req.URL.Path)
-					req.Host = config.static.address
-					req.URL.Host = config.static.address
+
+					// Set the request host (used as the "Host" header value).
+					req.Host = config.static.host
+
+					// Drop cookies given that the response should not vary.
 					req.Header.Del("Cookie")
 				} else {
+					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
 				}
 			}

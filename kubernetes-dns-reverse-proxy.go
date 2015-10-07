@@ -28,6 +28,11 @@ var config struct {
 		enable             bool
 		scheme, host, path string
 	}
+
+	fallback struct {
+		enable             bool
+		scheme, host, path string
+	}
 }
 
 func init() {
@@ -40,6 +45,10 @@ func init() {
 	flag.StringVar(&config.static.scheme, "static-scheme", "http", "static scheme")
 	flag.StringVar(&config.static.host, "static-host", "", "static host")
 	flag.StringVar(&config.static.path, "static-path", "/", "static path")
+	flag.BoolVar(&config.fallback.enable, "fallback", false, "enable fallback proxy")
+	flag.StringVar(&config.fallback.scheme, "fallback-scheme", "http", "fallback scheme")
+	flag.StringVar(&config.fallback.host, "fallback-host", "", "fallback host")
+	flag.StringVar(&config.fallback.path, "fallback-path", "/", "fallback path")
 	flag.StringVar(&config.routesFilename, "routes", "", "path to a routes file")
 }
 
@@ -106,7 +115,18 @@ func main() {
 			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
 				if err != director.NoMatchingServiceError {
 					log.Println(err)
+				} else {
+
+					// Send traffic to the fallback.
+					if config.fallback.enable {
+
+						// Set the URL scheme, host, and path.
+						req.URL.Scheme = config.fallback.scheme
+						req.URL.Host = config.fallback.host
+						req.URL.Path = path.Join(config.fallback.path, req.URL.Path)
+					}
 				}
+
 			} else {
 
 				// Check if the static proxy is enabled and the director-returned root

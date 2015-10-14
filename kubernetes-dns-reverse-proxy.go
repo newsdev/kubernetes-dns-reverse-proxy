@@ -13,23 +13,20 @@ import (
 	"strings"
 
 	"github.com/buth/kubernetes-dns-reverse-proxy/director"
+	"github.com/buth/kubernetes-dns-reverse-proxy/httpwrapper"
 )
 
 var config struct {
 	address, statusAddress string
 	domainSuffixes         string
 	routesFilename         string
+	concurrency            int
 
 	kubernetes struct {
 		namespace, dnsDomain string
 	}
 
-	static struct {
-		enable             bool
-		scheme, host, path string
-	}
-
-	fallback struct {
+	static, fallback struct {
 		enable             bool
 		scheme, host, path string
 	}
@@ -50,6 +47,7 @@ func init() {
 	flag.StringVar(&config.fallback.host, "fallback-host", "", "fallback host")
 	flag.StringVar(&config.fallback.path, "fallback-path", "/", "fallback path")
 	flag.StringVar(&config.routesFilename, "routes", "", "path to a routes file")
+	flag.IntVar(&config.concurrency, "concurrency", 32, "concurrency per host")
 }
 
 func main() {
@@ -97,10 +95,16 @@ func main() {
 
 	// Build the reverse proxy HTTP handler.
 	reverseProxy := &httputil.ReverseProxy{
-		Transport: &http.Transport{
-			MaxIdleConnsPerHost: 8,
+		Transport: &httpwrapper.Transport{
+			MaxConcurrencyPerHost: config.concurrency,
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: config.concurrency,
+			},
 		},
 		Director: func(req *http.Request) {
+
+			// Drop the connection header to ensure keepalives are maintained.
+			req.Header.Del("connection")
 
 			// First check against the domain suffixes.
 			for _, domainSuffix := range domainSuffixes {
@@ -142,7 +146,7 @@ func main() {
 					req.Host = config.static.host
 
 					// Drop cookies given that the response should not vary.
-					req.Header.Del("Cookie")
+					req.Header.Del("cookie")
 				} else {
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix

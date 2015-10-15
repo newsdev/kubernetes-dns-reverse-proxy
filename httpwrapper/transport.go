@@ -1,12 +1,10 @@
 package httpwrapper
 
 import (
-	"bytes"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
+	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -34,6 +32,7 @@ var (
 		"text/plain",
 		"text/x-component",
 	}
+	nothing = struct{}{}
 )
 
 type readCloserSem struct {
@@ -56,36 +55,49 @@ type Transport struct {
 	sem map[string]chan struct{}
 }
 
+func closeLogError(c io.Closer) {
+	if err := c.Close(); err != nil {
+		log.Println(err)
+	}
+}
+
 func compressResponse(resp *http.Response) error {
 
-	// Setup a new gzip writer built arround a bytes buffer.
-	buf := bytes.NewBuffer([]byte{})
-	gzipBuf, err := gzip.NewWriterLevel(buf, GzipCompressionLevel)
-	if err != nil {
-		return err
-	}
+	// Establish a new pipe.
+	pipeReader, pipeWriter := io.Pipe()
 
-	// Copy the response body to the gzip writer.
-	if _, err := io.Copy(gzipBuf, resp.Body); err != nil {
-		return err
-	}
-	resp.Body.Close()
+	// In a seperate Go routine, compress the request body and copy it to the
+	// pipe.
+	go func(r io.ReadCloser) {
 
-	// Flush and close the gzip buffer, as it won't be written to again.
-	gzipBuf.Flush()
-	gzipBuf.Close()
+		// Defer the closing of both the reader and writer.
+		defer closeLogError(r)
+		defer closeLogError(pipeWriter)
 
-	// Set content headers.
-	resp.Header.Set("Content-Encoding", "gzip")
-	resp.Header.Set("Content-Length", strconv.Itoa(buf.Len()))
-	resp.Body = ioutil.NopCloser(buf)
+		// Create a new gzip writer, wrapping the original writer, and defer its
+		// closing.
+		gzipWriter, err := gzip.NewWriterLevel(pipeWriter, GzipCompressionLevel)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer closeLogError(gzipWriter)
+
+		// Copy the response body to the gzip writer.
+		if _, err := io.Copy(gzipWriter, r); err != nil {
+			log.Println(err)
+		}
+	}(resp.Body)
+
+	resp.Header.Set("content-encoding", "gzip")
+	resp.Body = pipeReader
 	return nil
 }
 
 func compressionEnabledRequest(req *http.Request) bool {
 
 	// Check if the request defines the Accept-Encoding header.
-	requestAcceptEncoding := req.Header.Get("Accept-Encoding")
+	requestAcceptEncoding := req.Header.Get("accept-encoding")
 	if requestAcceptEncoding == "" {
 		return false
 	}
@@ -98,13 +110,18 @@ func compressableResponse(resp *http.Response) bool {
 
 	// Check if content length was defined. If it is and its value is lower than
 	// the MTU size, this isn't something we should try and compress.
-	responseContentLength := resp.Header.Get("Content-Length")
-	if size, err := strconv.Atoi(responseContentLength); err == nil && size < MTUSize {
+	if resp.ContentLength >= 0 && resp.ContentLength < MTUSize {
+		return false
+	}
+
+	// Check if the content has already been gzipped.
+	responseEncoding := resp.Header.Get("content-encoding")
+	if responseEncoding != "" && strings.Contains(responseEncoding, "gzip") {
 		return false
 	}
 
 	// Check if a response type has been defined.
-	responseType := resp.Header.Get("Content-Type")
+	responseType := resp.Header.Get("content-type")
 	if responseType == "" {
 		return false
 	}
@@ -128,10 +145,10 @@ func (t *Transport) getSem(req *http.Request) chan struct{} {
 	}
 
 	// Get the host-specific sem, initializing it beforehand if necessare.
-	sem, ok := t.sem[req.Host]
+	sem, ok := t.sem[req.URL.Host]
 	if !ok {
 		sem = make(chan struct{}, t.MaxConcurrencyPerHost)
-		t.sem[req.Host] = sem
+		t.sem[req.URL.Host] = sem
 	}
 	return sem
 }
@@ -142,7 +159,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var sem chan struct{}
 	if t.MaxConcurrencyPerHost > 0 {
 		sem = t.getSem(req)
-		sem <- struct{}{}
+		sem <- nothing
 	}
 
 	// Make the request.
@@ -150,6 +167,9 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Set a few debug headers.
+	resp.Header.Set("x-kubernetes-url", req.URL.String())
 
 	// Set up a sem release linked to the response being read.
 	if t.MaxConcurrencyPerHost > 0 {

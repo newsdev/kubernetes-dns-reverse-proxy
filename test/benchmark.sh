@@ -30,3 +30,6 @@ ab -qS -H host:blah -H accept-encoding:gzip -n 10000 -c 100 localhost:8080/statu
 
 echo '+ ab -c 100 lorem (gzip)'
 ab -qS -H host:blah -H accept-encoding:gzip -n 10000 -c 100 localhost:8080/lorem
+
+echo '+ ab -c 100 lorem.gz (gzip)'
+ab -qS -H host:blah -H accept-encoding:gzip -n 10000 -c 100 localhost:8080/lorem

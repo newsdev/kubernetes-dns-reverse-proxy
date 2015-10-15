@@ -90,6 +90,7 @@ func compressResponse(resp *http.Response) error {
 	}(resp.Body)
 
 	resp.Header.Set("content-encoding", "gzip")
+	resp.Header.Del("content-length")
 	resp.Body = pipeReader
 	return nil
 }
@@ -162,11 +163,15 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		sem <- nothing
 	}
 
+	log.Println(req.URL.String())
+
 	// Make the request.
 	resp, err := t.Transport.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Println(resp)
 
 	// Set a few debug headers.
 	resp.Header.Set("x-kubernetes-url", req.URL.String())

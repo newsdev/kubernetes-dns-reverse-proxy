@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 const (
@@ -45,12 +46,14 @@ func main() {
 	})
 
 	http.HandleFunc("/lorem", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-length", strconv.Itoa(len(lorem)))
 		fmt.Fprintf(w, lorem)
 	})
 
 	http.HandleFunc("/lorem.gz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-encoding", "gzip")
 		w.Write(loremGzip)
+
 	})
 
 	log.Fatal(http.ListenAndServe(":8090", nil))

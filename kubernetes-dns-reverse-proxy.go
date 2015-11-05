@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/buth/kubernetes-dns-reverse-proxy/director"
 	"github.com/buth/kubernetes-dns-reverse-proxy/httpwrapper"
@@ -21,6 +23,7 @@ var config struct {
 	domainSuffixes         string
 	routesFilename         string
 	concurrency            int
+	timeout                time.Duration
 
 	kubernetes struct {
 		namespace, dnsDomain string
@@ -48,6 +51,7 @@ func init() {
 	flag.StringVar(&config.fallback.path, "fallback-path", "/", "fallback path")
 	flag.StringVar(&config.routesFilename, "routes", "", "path to a routes file")
 	flag.IntVar(&config.concurrency, "concurrency", 32, "concurrency per host")
+	flag.DurationVar(&config.timeout, "timeout", time.Second, "dial timeout")
 }
 
 func main() {
@@ -99,6 +103,9 @@ func main() {
 			MaxConcurrencyPerHost: config.concurrency,
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: config.concurrency,
+				Dial: func(network, addr string) (net.Conn, error) {
+					return net.DialTimeout(network, addr, config.timeout)
+				},
 			},
 		},
 		Director: func(req *http.Request) {

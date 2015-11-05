@@ -163,15 +163,18 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		sem <- nothing
 	}
 
-	log.Println(req.URL.String())
-
 	// Make the request.
 	resp, err := t.Transport.RoundTrip(req)
 	if err != nil {
+
+		// Check if we need to release the sem.
+		if t.MaxConcurrencyPerHost > 0 {
+			<-sem
+		}
+
+		// Return the error.
 		return nil, err
 	}
-
-	log.Println(resp)
 
 	// Set a few debug headers.
 	resp.Header.Set("x-kubernetes-url", req.URL.String())

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/buth/kubernetes-dns-reverse-proxy/director"
-	"github.com/buth/kubernetes-dns-reverse-proxy/httpwrapper"
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/httpwrapper"
 )
 
 var config struct {

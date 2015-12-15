@@ -19,11 +19,11 @@ import (
 )
 
 var config struct {
-	address, statusAddress string
-	domainSuffixes         string
-	routesFilename         string
-	concurrency            int
-	timeout                time.Duration
+	address, statusAddress        string
+	domainSuffixes                string
+	routesFilename                string
+	concurrency, compressionLevel int
+	timeout                       time.Duration
 
 	kubernetes struct {
 		namespace, dnsDomain string
@@ -51,6 +51,7 @@ func init() {
 	flag.StringVar(&config.fallback.path, "fallback-path", "/", "fallback path")
 	flag.StringVar(&config.routesFilename, "routes", "", "path to a routes file")
 	flag.IntVar(&config.concurrency, "concurrency", 32, "concurrency per host")
+	flag.IntVar(&config.compressionLevel, "compression-level", 4, "gzip compression level (0 to disable)")
 	flag.DurationVar(&config.timeout, "timeout", time.Second, "dial timeout")
 }
 
@@ -101,6 +102,7 @@ func main() {
 	reverseProxy := &httputil.ReverseProxy{
 		Transport: &httpwrapper.Transport{
 			MaxConcurrencyPerHost: config.concurrency,
+			CompressionLevel:      config.compressionLevel,
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: config.concurrency,
 				Dial: func(network, addr string) (net.Conn, error) {

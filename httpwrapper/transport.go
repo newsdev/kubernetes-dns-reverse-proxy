@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	GzipCompressionLevel = 2
-	MTUSize              = 1000
+	MTUSize = 1000
 )
 
 var (
@@ -47,8 +46,8 @@ func (c *readCloserSem) Close() error {
 }
 
 type Transport struct {
-	Transport             http.RoundTripper
-	MaxConcurrencyPerHost int
+	Transport                               http.RoundTripper
+	MaxConcurrencyPerHost, CompressionLevel int
 
 	// Unexported attributes.
 	mu  sync.Mutex
@@ -61,7 +60,7 @@ func closeLogError(c io.Closer) {
 	}
 }
 
-func compressResponse(resp *http.Response) error {
+func compressResponse(resp *http.Response, compressionLevel int) error {
 
 	// Establish a new pipe.
 	pipeReader, pipeWriter := io.Pipe()
@@ -76,7 +75,7 @@ func compressResponse(resp *http.Response) error {
 
 		// Create a new gzip writer, wrapping the original writer, and defer its
 		// closing.
-		gzipWriter, err := gzip.NewWriterLevel(pipeWriter, GzipCompressionLevel)
+		gzipWriter, err := gzip.NewWriterLevel(pipeWriter, compressionLevel)
 		if err != nil {
 			log.Println(err)
 			return
@@ -185,8 +184,8 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	// Check if we should compress the respondse
-	if compressionEnabledRequest(req) && compressableResponse(resp) {
-		if err := compressResponse(resp); err != nil {
+	if t.CompressionLevel > 0 && compressionEnabledRequest(req) && compressableResponse(resp) {
+		if err := compressResponse(resp, t.CompressionLevel); err != nil {
 			return nil, err
 		}
 	}

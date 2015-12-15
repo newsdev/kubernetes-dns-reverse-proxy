@@ -24,6 +24,7 @@ var config struct {
 	routesFilename                string
 	concurrency, compressionLevel int
 	timeout                       time.Duration
+	validateRoutes                bool
 
 	kubernetes struct {
 		namespace, dnsDomain string
@@ -50,6 +51,7 @@ func init() {
 	flag.StringVar(&config.fallback.host, "fallback-host", "", "fallback host")
 	flag.StringVar(&config.fallback.path, "fallback-path", "/", "fallback path")
 	flag.StringVar(&config.routesFilename, "routes", "", "path to a routes file")
+	flag.BoolVar(&config.validateRoutes, "validate-routes", false, "validate routes file and exit")
 	flag.IntVar(&config.concurrency, "concurrency", 32, "concurrency per host")
 	flag.IntVar(&config.compressionLevel, "compression-level", 4, "gzip compression level (0 to disable)")
 	flag.DurationVar(&config.timeout, "timeout", time.Second, "dial timeout")
@@ -70,7 +72,7 @@ func main() {
 	d := director.NewDirector()
 
 	// Check for a routes JSON file.
-	if config.routesFilename != "" {
+	if config.validateRoutes || config.routesFilename != "" {
 
 		routesFile, err := os.Open(config.routesFilename)
 		if err != nil {
@@ -95,6 +97,11 @@ func main() {
 			for prefix, service := range prefixMap {
 				d.SetService(domain, prefix, service)
 			}
+		}
+
+		log.Println("routes are valid!")
+		if config.validateRoutes {
+			return
 		}
 	}
 

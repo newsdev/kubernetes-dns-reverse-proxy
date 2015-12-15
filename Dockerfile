@@ -6,8 +6,9 @@ RUN adduser -SHs /bin/false golang-app
 # Add the source code and build the binary.
 ENV GO15VENDOREXPERIMENT=1
 ADD . $GOPATH/src/github.com/newsdev/kubernetes-dns-reverse-proxy
-RUN cd $GOPATH/src/github.com/newsdev/kubernetes-dns-reverse-proxy && go install .
+WORKDIR $GOPATH/src/github.com/newsdev/kubernetes-dns-reverse-proxy
+RUN go install .
 
 # Run as the system-user.
 USER golang-app
-ENTRYPOINT ["kubernetes-dns-reverse-proxy"]
+CMD ["kubernetes-dns-reverse-proxy"]

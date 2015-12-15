@@ -7,18 +7,31 @@ Itself runs as a container within a kubernetes cluster with the path to the conf
 ### Options
 
 `--domain-suffixes` Domain suffixes, comma separated. Default: `.local`
+
 `--kubernetes-dns-domain` Kubernetes DNS domain. Default: `cluster.local`
+
 `--kubernetes-namespace` Kubernetes namespace to server. Default: `default`
+
 `--static` Whether to enable the proxy to serve content from a static file server. Default: `false`
+
 `--static-scheme` Scheme of the static file server. Default: `http`
+
 `--static-host` Hostname of the static file server. Default: ``
+
 `--static-path` Path prefix of the static file server. Default: `/`
+
 `--fallback` Whether to enable a fallback proxy. Default: `false`
+
 `--fallback-scheme` Fallback scheme. Default: `http`
+
 `--fallback-host` Fallback host. Default: ``
+
 `--fallback-path` Fallback path. Default: `/`
+
 `--routes` Absolute path to the routes file. Default: ``
+
 `--concurrency` concurrency per host. Default: `32`
+
 `--timeout` dial timeout.
 
 ### Routes Syntax

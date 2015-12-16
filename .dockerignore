@@ -1,6 +1,5 @@
 .DS_Store
 .git*
-Dockerfile
 Makefile
 README.md
 bin

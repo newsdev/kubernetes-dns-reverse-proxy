@@ -36,25 +36,39 @@ Itself runs as a container within a kubernetes cluster with the path to the conf
 
 ### Routes Syntax
 
+The `routes.json` file is a JSON object with hostnames as top-level keys. Each hostname references an object with path prefixes as keys. Each path prefix is a key to a pattern.
+
+```
+{
+  "example.com": {
+  	"/": "<pattern>"
+  }
+}
+```
+
+Possible patterns are as follows.
+
 | pattern  | result   | example |
 | -------- | -------- | ------- |
-| service_name | Routed to service | "myservice" routed to myservice.<kubernetes-namespace>.<kubernetes-dns-domain> |
-| /static_dir  | Routed to static-host + /static_dir + request_path | "/elections" routed to <static-host>/<static-path>/request_path |
+| `myservice` | Routed to a kubernetes service | "myservice" routed to `myservice.<kubernetes-namespace>.<kubernetes-dns-domain>` |
+| `/static_dir`  | Routed to a static host like S3 | "/static_dir" routed to `<static-host>/<static-path>/request_path` |
 
-
-### How to contribute
-
-TK
 
 ### How to run the demo
 
+There's a shell script to get a local server running. First set up your `$GOPATH`, then clone the repo into `$GOPATH/src/github.com/newsdev/kubernetes-dns-reverse-proxy`
+
 ```
-git clone git@github.com:newsdev/kubernetes-routing.git
-cd kubernetes-routing
+export $GOPATH=~/gocode
+cd $GOPATH
+mkdir -p src/github.com/newsdev/
+cd src/github.com/newsdev
+git clone git@github.com:newsdev/kubernetes-dns-reverse-proxy.git
+cd kubernetes-dns-reverse-proxy
 ./test/demo.sh
 ```
 
-This boots a copy of the kubernetes-routing server on localhost:8080, and the test server on localhost:8090 (this echos back the `Host` heeader provided).
+This boots a copy of the kubernetes-dns-reverse-proxy server on localhost:8080, and the test server on localhost:8090 (this echos back the `Host` heeader provided).
 
 Hit [http://www.127.0.0.1.xip.io:8080/projects/app1](http://www.127.0.0.1.xip.io:8080/projects/app1) and check your local logs.  You'll see this route to service1 as specified in the routes.  
 
@@ -67,7 +81,5 @@ TK
 
 #### Performance benchmarking
 
-```
-make benchmark
-```
+TK 
 

@@ -45,6 +45,12 @@ func main() {
 		fmt.Fprintf(w, "ok")
 	})
 
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		w.Header().Set("content-length", strconv.Itoa(len(host)))
+		fmt.Fprintf(w, host)
+	})
+
 	http.HandleFunc("/lorem", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-length", strconv.Itoa(len(lorem)))
 		fmt.Fprintf(w, lorem)

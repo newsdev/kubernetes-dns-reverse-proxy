@@ -1,5 +1,10 @@
 {
-  "blah": {
-    "/": "/"
+  "www.127.0.0.1.xip.io:8080": {
+    "/projects/app1": "service1",
+    "/projects/app2": "service2"
+  },
+
+  "app3.127.0.0.1.xip.io:8080": {
+    "/": "service3"
   }
 }

@@ -46,6 +46,21 @@ TK
 
 The Makefile builds within a docker container so you must have docker set-up locally.
 
+### How to run the demo
+
+```
+git clone git@github.com:newsdev/kubernetes-routing.git
+cd kubernetes-routing
+./test/demo.sh
+```
+
+This boots a copy of the kubernetes-routing server on localhost:8080, and the test server on localhost:8090 (this echos back the `Host` heeader provided).
+
+Hit [http://www.127.0.0.1.xip.io:8080/projects/app1](http://www.127.0.0.1.xip.io:8080/projects/app2) and check your local logs.  You'll see this route to service1 as specified in the routes.  
+
+Try [http://www.127.0.0.1.xip.io:8080/projects/app2](http://www.127.0.0.1.xip.io:8080/projects/app2).  This should route to service 2.
+
+
 #### How to run test suite
 
 TK

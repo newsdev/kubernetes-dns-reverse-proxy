@@ -48,8 +48,10 @@ TK
 
 ### How to run the demo
 
+First, make sure you have a `GOPATH` defined in your environment, then:
+
 ```
-git clone git@github.com:newsdev/kubernetes-routing.git
+go get github.com/newsdev/kubernetes-dns-reverse-proxy
 cd kubernetes-routing
 ./test/demo.sh
 ```

@@ -121,20 +121,23 @@ func main() {
 
 			// Drop the connection header to ensure keepalives are maintained.
 			req.Header.Del("connection")
-
+		
 			// First check against the domain suffixes.
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
+					log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
 					return
 				}
 			}
 
 			// Then try the director.
 			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
+
 				if err != director.NoMatchingServiceError {
-					log.Println(err)
+
+					log.Println("Error:", req.Host, req.URL.Path, err)
 				} else {
 
 					// Send traffic to the fallback.
@@ -144,11 +147,12 @@ func main() {
 						req.URL.Scheme = config.fallback.scheme
 						req.URL.Host = config.fallback.host
 						req.URL.Path = path.Join(config.fallback.path, req.URL.Path)
+
+						log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
 					}
 				}
 
 			} else {
-
 				// Check if the static proxy is enabled and the director-returned root
 				// is a path prefix.
 				if config.static.enable && strings.HasPrefix(root, "/") {
@@ -163,9 +167,12 @@ func main() {
 
 					// Drop cookies given that the response should not vary.
 					req.Header.Del("cookie")
+
+					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
 				} else {
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
+					log.Println("Proxy:", req.Host, req.URL.Path, "to", req.URL.Host)
 				}
 			}
 		},

@@ -1,7 +1,9 @@
 {
   "www.127.0.0.1.xip.io:8080": {
     "/projects/app1": "service1",
-    "/projects/app2": "service2"
+    "/projects/app2": "service2",
+    "/lorem": "loremservice",
+    "/static": "/static_app"
   },
 
   "app3.127.0.0.1.xip.io:8080": {

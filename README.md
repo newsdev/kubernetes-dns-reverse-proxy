@@ -36,15 +36,15 @@ Itself runs as a container within a kubernetes cluster with the path to the conf
 
 ### Routes Syntax
 
-TK
+| pattern  | result   | example |
+| -------- | -------- | ------- |
+| service_name | Routed to service | "myservice" routed to myservice.<kubernetes-namespace>.<kubernetes-dns-domain> |
+| /static_dir  | Routed to static-host + /static_dir + request_path | "/elections" routed to <static-host>/<static-path>/request_path |
+
 
 ### How to contribute
 
 TK
-
-### How to build
-
-The Makefile builds within a docker container so you must have docker set-up locally.
 
 ### How to run the demo
 
@@ -56,7 +56,7 @@ cd kubernetes-routing
 
 This boots a copy of the kubernetes-routing server on localhost:8080, and the test server on localhost:8090 (this echos back the `Host` heeader provided).
 
-Hit [http://www.127.0.0.1.xip.io:8080/projects/app1](http://www.127.0.0.1.xip.io:8080/projects/app2) and check your local logs.  You'll see this route to service1 as specified in the routes.  
+Hit [http://www.127.0.0.1.xip.io:8080/projects/app1](http://www.127.0.0.1.xip.io:8080/projects/app1) and check your local logs.  You'll see this route to service1 as specified in the routes.  
 
 Try [http://www.127.0.0.1.xip.io:8080/projects/app2](http://www.127.0.0.1.xip.io:8080/projects/app2).  This should route to service 2.
 

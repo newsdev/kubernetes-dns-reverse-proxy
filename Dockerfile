@@ -1,7 +1,7 @@
-FROM golang:1.5.2-alpine
+FROM golang:1.5.2
 
 # Add a system-user for the Go application.
-RUN adduser -SHs /bin/false golang-app
+RUN adduser --system golang-app
 
 # Add the source code and build the binary.
 ENV GO15VENDOREXPERIMENT=1

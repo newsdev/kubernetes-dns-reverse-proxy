@@ -174,6 +174,8 @@ func main() {
 
 					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
 				} else if url := strings.TrimPrefix(root, ">"); url != root {
+					url += req.URL.Path
+					//TODO: pass query string along with
 					log.Printf("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
 					http.Redirect(w, req, url, 301)
 					return

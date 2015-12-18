@@ -6,6 +6,10 @@
     "/static": "/static_app"
   },
 
+  "adcom.127.0.0.1.xip.io:8080": {
+    "/": "/adcom_nyt"
+  },
+
   "app3.127.0.0.1.xip.io:8080": {
     "/": "service3"
   },

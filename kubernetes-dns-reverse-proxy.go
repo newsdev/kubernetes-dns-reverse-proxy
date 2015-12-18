@@ -126,6 +126,11 @@ func main() {
 	mainServer := &http.Server{
 		Addr: config.address,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+
+			// TODO: 
+			// doesn't seem to be a way of routing something that matches the domain suffix
+			// into either static or redirect
+
 			// First check against the domain suffixes, e.g. {service}.local
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
@@ -164,7 +169,14 @@ func main() {
 					// Set the URL scheme, host, and path.
 					req.URL.Scheme = config.static.scheme
 					req.URL.Host = config.static.host
+
+					log.Println("Path: ", req.URL.Path)
+					trailing := strings.HasSuffix(req.URL.Path, "/")
+
 					req.URL.Path = path.Join(config.static.path, root, req.URL.Path)
+					if trailing && !strings.HasSuffix(req.URL.Path, "/") {
+						req.URL.Path += "/"
+					}
 
 					// Set the request host (used as the "Host" header value).
 					req.Host = config.static.host
@@ -173,6 +185,20 @@ func main() {
 					req.Header.Del("cookie")
 
 					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
+
+					// TODO:
+					// we need to modify response
+					// with equivalent of nginx
+					// proxy_redirect /<%= application.name %>/ /;
+					// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_redirect
+					// otherwise, AWS returned redirects will have wrong paths
+					//
+					// for example
+					// curl -v http://well.127.0.0.1.xip.io:8080/projects/workouts
+					// Location: /well_workout/projects/workouts/
+					// needs to get rewritten to
+					// Location: /projects/workouts/
+
 				} else if url := strings.TrimPrefix(root, ">"); url != root {
 					url += req.URL.Path
 					//TODO: pass query string along with

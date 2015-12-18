@@ -9,6 +9,10 @@
   "adcom.127.0.0.1.xip.io:8080": {
     "/": "/adcom_nyt"
   },
+  "well.127.0.0.1.xip.io:8080": {
+    "/projects/activity-trackers": "/well_projects",
+    "/projects/workouts": "/well_workout"
+  },
 
   "app3.127.0.0.1.xip.io:8080": {
     "/": "service3"

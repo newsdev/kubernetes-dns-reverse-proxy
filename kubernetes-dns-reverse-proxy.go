@@ -121,8 +121,8 @@ func main() {
 
 			// Drop the connection header to ensure keepalives are maintained.
 			req.Header.Del("connection")
-		
-			// First check against the domain suffixes.
+
+			// First check against the domain suffixes, e.g. {service}.local
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 					req.URL.Scheme = "http"
@@ -179,8 +179,17 @@ func main() {
 	}
 
 	reverseProxyServer := &http.Server{
-		Addr:    config.address,
+		Addr:    ":8092",
 		Handler: reverseProxy,
+	}
+
+	mainServer :=  &http.Server{
+		Addr: config.address,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// fmt.Fprintf(w, "ok")
+			reverseProxy.ServeHTTP( w, r );
+			// http.Redirect( w, r, "http://www.nytco.com", 302 );
+		}),
 	}
 
 	statusServer := &http.Server{
@@ -196,6 +205,11 @@ func main() {
 	go func() {
 		log.Println("starting server on", config.address)
 		errs <- reverseProxyServer.ListenAndServe()
+	}()
+
+	go func() {
+		log.Println("starting server on", config.address)
+		errs <- mainServer.ListenAndServe()
 	}()
 
 	go func() {

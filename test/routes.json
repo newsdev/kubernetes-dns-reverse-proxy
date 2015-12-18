@@ -8,5 +8,13 @@
 
   "app3.127.0.0.1.xip.io:8080": {
     "/": "service3"
+  },
+
+  "service4.pub.stg.127.0.0.1.xip.io:8080": {
+    "/": "service4"
+  },
+
+  "old.127.0.0.1.xip.io:8080": {
+    "/": ">http://new.127.0.0.1.xip.io:8080"
   }
 }

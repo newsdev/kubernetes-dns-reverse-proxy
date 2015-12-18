@@ -118,21 +118,25 @@ func main() {
 			},
 		},
 		Director: func(req *http.Request) {
+			// empty director atm
 
-			// Drop the connection header to ensure keepalives are maintained.
-			req.Header.Del("connection")
+		},
+	}
 
+	mainServer := &http.Server{
+		Addr: config.address,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// First check against the domain suffixes, e.g. {service}.local
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
 					log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
+					reverseProxy.ServeHTTP(w, req)
 					return
 				}
 			}
 
-			// Then try the director.
 			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
 
 				if err != director.NoMatchingServiceError {
@@ -169,26 +173,18 @@ func main() {
 					req.Header.Del("cookie")
 
 					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
+				} else if url := strings.TrimPrefix(root, ">"); url != root {
+					log.Printf("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
+					http.Redirect(w, req, url, 301)
+					return
 				} else {
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
 					log.Println("Proxy:", req.Host, req.URL.Path, "to", req.URL.Host)
 				}
 			}
-		},
-	}
 
-	reverseProxyServer := &http.Server{
-		Addr:    ":8092",
-		Handler: reverseProxy,
-	}
-
-	mainServer :=  &http.Server{
-		Addr: config.address,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// fmt.Fprintf(w, "ok")
-			reverseProxy.ServeHTTP( w, r );
-			// http.Redirect( w, r, "http://www.nytco.com", 302 );
+			reverseProxy.ServeHTTP(w, req)
 		}),
 	}
 
@@ -201,11 +197,6 @@ func main() {
 
 	// Each server could return a fatal error, so make a channel to signal on.
 	errs := make(chan error)
-
-	go func() {
-		log.Println("starting server on", config.address)
-		errs <- reverseProxyServer.ListenAndServe()
-	}()
 
 	go func() {
 		log.Println("starting server on", config.address)

@@ -1,5 +1,8 @@
 package httpwrapper
 
+// An HTTP client which rate limits requests to application back-ends
+// and compresses responses.
+
 import (
 	"compress/gzip"
 	"io"
@@ -73,8 +76,8 @@ func compressResponse(resp *http.Response, compressionLevel int) error {
 		defer closeLogError(r)
 		defer closeLogError(pipeWriter)
 
-		// Create a new gzip writer, wrapping the original writer, and defer its
-		// closing.
+		// Create a new gzip writer, wrapping the original writer,
+		// and defer its closing.
 		gzipWriter, err := gzip.NewWriterLevel(pipeWriter, compressionLevel)
 		if err != nil {
 			log.Println(err)
@@ -135,6 +138,7 @@ func compressableResponse(resp *http.Response) bool {
 	return false
 }
 
+// Get the semaphore.
 func (t *Transport) getSem(req *http.Request) chan struct{} {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -153,6 +157,7 @@ func (t *Transport) getSem(req *http.Request) chan struct{} {
 	return sem
 }
 
+// Wraps the HTTP request with a semaphore to rate limit requests.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Get the sem for this request and try to aquire it.
@@ -183,7 +188,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		resp.Body = &readCloserSem{resp.Body, sem}
 	}
 
-	// Check if we should compress the respondse
+	// Check if we should compress the response.
 	if t.CompressionLevel > 0 && compressionEnabledRequest(req) && compressableResponse(resp) {
 		if err := compressResponse(resp, t.CompressionLevel); err != nil {
 			return nil, err

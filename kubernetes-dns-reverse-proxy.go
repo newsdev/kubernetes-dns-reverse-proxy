@@ -107,6 +107,7 @@ func main() {
 
 	// Build the reverse proxy HTTP handler.
 	reverseProxy := &httputil.ReverseProxy{
+		// Specify a custom transport which rate limits requests and compresses responses.
 		Transport: &httpwrapper.Transport{
 			MaxConcurrencyPerHost: config.concurrency,
 			CompressionLevel:      config.compressionLevel,
@@ -117,11 +118,13 @@ func main() {
 				},
 			},
 		},
+		// The Director has the opportunity to modify the HTTP request before it
+		// is handed off to the Transport.
 		Director: func(req *http.Request) {
 
 			// Drop the connection header to ensure keepalives are maintained.
 			req.Header.Del("connection")
-		
+
 			// First check against the domain suffixes.
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {

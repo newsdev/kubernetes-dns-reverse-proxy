@@ -125,7 +125,8 @@ func main() {
 			// Drop the connection header to ensure keepalives are maintained.
 			req.Header.Del("connection")
 
-			// First check against the domain suffixes.
+			// Check if the request is for a default domain-based service routing
+			// i.e. http://{servicename}.{domain-suffix}/
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 					req.URL.Scheme = "http"
@@ -135,8 +136,10 @@ func main() {
 				}
 			}
 
-			// Then try the director.
+			// Then, try the director.
+
 			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
+				// The director didn't find a match, handle it gracefully.
 
 				if err != director.NoMatchingServiceError {
 
@@ -156,9 +159,10 @@ func main() {
 				}
 
 			} else {
-				// Check if the static proxy is enabled and the director-returned root
-				// is a path prefix.
+				// The director found a match.
+
 				if config.static.enable && strings.HasPrefix(root, "/") {
+					// Handle static file requests.
 
 					// Set the URL scheme, host, and path.
 					req.URL.Scheme = config.static.scheme
@@ -173,6 +177,8 @@ func main() {
 
 					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
 				} else {
+					// Handle an arbitrary URL routing to a service.
+
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
 					log.Println("Proxy:", req.Host, req.URL.Path, "to", req.URL.Host)

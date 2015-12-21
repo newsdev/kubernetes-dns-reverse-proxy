@@ -51,7 +51,7 @@ func main() {
 		host := r.Host
 		w.Header().Set("content-length", strconv.Itoa(len(host)))
 		fmt.Fprintf(w, host)
-		log.Println(r.URL.Path)
+		log.Println("Test Server: ", r.URL.Path)
 	})
 
 	http.HandleFunc("/lorem", func(w http.ResponseWriter, r *http.Request) {

@@ -119,7 +119,6 @@ func main() {
 		},
 		Director: func(req *http.Request) {
 			// empty director atm
-
 		},
 	}
 
@@ -166,6 +165,25 @@ func main() {
 				// is a path prefix.
 				if config.static.enable && strings.HasPrefix(root, "/") {
 
+					// we need to modify response
+					// with equivalent of nginx
+					// proxy_redirect /<%= application.name %>/ /;
+					// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_redirect
+					// // Sets the text that should be changed in the “Location” and “Refresh” header
+					// // fields of a proxied server response.
+					// Otherwise, AWS returned redirects will have wrong paths
+					//
+					// for example
+					// curl -v http://well.127.0.0.1.xip.io:8080/projects/workouts
+					// Location: /well_workout/projects/workouts/
+					// needs to get rewritten to
+					// Location: /projects/workouts/
+					// so
+					// here we set headers so that
+					// in httpwrapper.Transport.RoundTrip we know what's needed to  be replaced
+					req.Header.Add("x-static-root", path.Join(config.static.path, root)+"/")
+					req.Header.Add("x-original-url", req.Host+req.URL.String())
+
 					// Set the URL scheme, host, and path.
 					req.URL.Scheme = config.static.scheme
 					req.URL.Host = config.static.host
@@ -184,20 +202,8 @@ func main() {
 					// Drop cookies given that the response should not vary.
 					req.Header.Del("cookie")
 
-					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
+					log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
 
-					// TODO:
-					// we need to modify response
-					// with equivalent of nginx
-					// proxy_redirect /<%= application.name %>/ /;
-					// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_redirect
-					// otherwise, AWS returned redirects will have wrong paths
-					//
-					// for example
-					// curl -v http://well.127.0.0.1.xip.io:8080/projects/workouts
-					// Location: /well_workout/projects/workouts/
-					// needs to get rewritten to
-					// Location: /projects/workouts/
 
 				} else if url := strings.TrimPrefix(root, ">"); url != root {
 					url += req.URL.Path
@@ -208,7 +214,7 @@ func main() {
 				} else {
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
-					log.Println("Proxy:", req.Host, req.URL.Path, "to", req.URL.Host)
+					log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
 				}
 			}
 

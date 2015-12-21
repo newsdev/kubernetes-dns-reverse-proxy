@@ -175,6 +175,21 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
+	// if this is a static request (i.e. req.URL matches static host and path)
+	// then gsub 'static-root' out of Location. (from d.Service(req.Host, req.URL.Path))
+	staticRoot := req.Header.Get("x-static-root")
+	s3Location := resp.Header.Get("Location")
+	s3Refresh := resp.Header.Get("Refresh")
+	if staticRoot != "" {
+		if s3Location != "" {
+			resp.Header.Set("Location", strings.Replace(s3Location, staticRoot, "/", 1))
+			log.Println("Location translated:", resp.Header.Get("Location"))
+		} else if s3Refresh != "" {
+			resp.Header.Set("Refresh", strings.Replace(s3Refresh, staticRoot, "/", 1))
+			log.Println("Refresh translated:", resp.Header.Get("Refresh"))
+		}
+	}
+
 	// Set a few debug headers.
 	resp.Header.Set("x-kubernetes-url", req.URL.String())
 

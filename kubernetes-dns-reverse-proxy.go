@@ -121,23 +121,34 @@ func main() {
 		// The Director has the opportunity to modify the HTTP request before it
 		// is handed off to the Transport.
 		Director: func(req *http.Request) {
+			// empty director atm
+		},
+	}
+
+	mainServer := &http.Server{
+		Addr: config.address,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+
+			// TODO: 
+			// doesn't seem to be a way of routing something that matches the domain suffix
+			// into either static or redirect
 
 			// Drop the connection header to ensure keepalives are maintained.
 			req.Header.Del("connection")
 
-			// Check if the request is for a default domain-based service routing
+			// First, check if the request is for a default domain-based service routing
 			// i.e. http://{servicename}.{domain-suffix}/
 			for _, domainSuffix := range domainSuffixes {
 				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
 					log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
+					reverseProxy.ServeHTTP(w, req)
 					return
 				}
 			}
 
 			// Then, try the director.
-
 			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
 				// The director didn't find a match, handle it gracefully.
 
@@ -164,10 +175,36 @@ func main() {
 				if config.static.enable && strings.HasPrefix(root, "/") {
 					// Handle static file requests.
 
+					// we need to modify response
+					// with equivalent of nginx
+					// proxy_redirect /<%= application.name %>/ /;
+					// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_redirect
+					// // Sets the text that should be changed in the “Location” and “Refresh” header
+					// // fields of a proxied server response.
+					// Otherwise, AWS returned redirects will have wrong paths
+					//
+					// for example
+					// curl -v http://well.127.0.0.1.xip.io:8080/projects/workouts
+					// Location: /well_workout/projects/workouts/
+					// needs to get rewritten to
+					// Location: /projects/workouts/
+					// so
+					// here we set headers so that
+					// in httpwrapper.Transport.RoundTrip we know what's needed to  be replaced
+					req.Header.Add("x-static-root", path.Join(config.static.path, root)+"/")
+					req.Header.Add("x-original-url", req.Host+req.URL.String())
+
 					// Set the URL scheme, host, and path.
 					req.URL.Scheme = config.static.scheme
 					req.URL.Host = config.static.host
+
+					log.Println("Path: ", req.URL.Path)
+					trailing := strings.HasSuffix(req.URL.Path, "/")
+
 					req.URL.Path = path.Join(config.static.path, root, req.URL.Path)
+					if trailing && !strings.HasSuffix(req.URL.Path, "/") {
+						req.URL.Path += "/"
+					}
 
 					// Set the request host (used as the "Host" header value).
 					req.Host = config.static.host
@@ -175,21 +212,29 @@ func main() {
 					// Drop cookies given that the response should not vary.
 					req.Header.Del("cookie")
 
-					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
+					log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
+
+
+				} else if url := strings.TrimPrefix(root, ">"); url != root {
+					url += req.URL.Path
+					if req.URL.RawQuery != "" {
+						url += "?"+req.URL.RawQuery
+					}
+					//TODO: pass query string along with
+					log.Printf("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
+					http.Redirect(w, req, url, 301)
+					return
 				} else {
 					// Handle an arbitrary URL routing to a service.
 
 					req.URL.Scheme = "http"
 					req.URL.Host = root + kubernetesSuffix
-					log.Println("Proxy:", req.Host, req.URL.Path, "to", req.URL.Host)
+					log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
 				}
 			}
-		},
-	}
 
-	reverseProxyServer := &http.Server{
-		Addr:    config.address,
-		Handler: reverseProxy,
+			reverseProxy.ServeHTTP(w, req)
+		}),
 	}
 
 	statusServer := &http.Server{
@@ -204,7 +249,7 @@ func main() {
 
 	go func() {
 		log.Println("starting server on", config.address)
-		errs <- reverseProxyServer.ListenAndServe()
+		errs <- mainServer.ListenAndServe()
 	}()
 
 	go func() {

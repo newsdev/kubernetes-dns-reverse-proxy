@@ -126,10 +126,6 @@ func main() {
 		Addr: config.address,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 
-			// TODO:
-			// doesn't seem to be a way of routing something that matches the domain suffix
-			// into either static or redirect
-
 			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
 
 				if err != director.NoMatchingServiceError {

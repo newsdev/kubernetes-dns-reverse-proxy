@@ -1,4 +1,8 @@
 {
+  "old-app.pub.stg.127.0.0.1.xip.io:8080": {
+      "/": "old-app", 
+      "/2012": "/baked_2012/"
+  }, 
   "www.127.0.0.1.xip.io:8080": {
     "/projects/app1": "service1",
     "/projects/app2": "service2",

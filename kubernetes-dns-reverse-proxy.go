@@ -129,35 +129,25 @@ func main() {
 		Addr: config.address,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 
-			// TODO: 
-			// doesn't seem to be a way of routing something that matches the domain suffix
-			// into either static or redirect
-
-			// Drop the connection header to ensure keepalives are maintained.
-			req.Header.Del("connection")
-
-			// First, check if the request is for a default domain-based service routing
-			// i.e. http://{servicename}.{domain-suffix}/
-			for _, domainSuffix := range domainSuffixes {
-				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
-					req.URL.Scheme = "http"
-					req.URL.Host = root + kubernetesSuffix
-					log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
-					reverseProxy.ServeHTTP(w, req)
-					return
-				}
-			}
-
-			// Then, try the director.
 			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
 				// The director didn't find a match, handle it gracefully.
 
 				if err != director.NoMatchingServiceError {
-
 					log.Println("Error:", req.Host, req.URL.Path, err)
 				} else {
 
-					// Send traffic to the fallback.
+					// If NoMatchingServiceError is thrown, check against the domain suffixes, e.g. {service}.local
+					for _, domainSuffix := range domainSuffixes {
+						if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
+							req.URL.Scheme = "http"
+							req.URL.Host = root + kubernetesSuffix
+							log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
+							reverseProxy.ServeHTTP(w, req)
+							return
+						}
+					}
+
+					// Otherwise, send traffic to the fallback.
 					if config.fallback.enable {
 
 						// Set the URL scheme, host, and path.
@@ -166,7 +156,10 @@ func main() {
 						req.URL.Path = path.Join(config.fallback.path, req.URL.Path)
 
 						log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
+					} else {
+						log.Println("Error: no route matched and fallback not enabled for", req.Host, req.URL.Path)
 					}
+
 				}
 
 			} else {
@@ -214,11 +207,10 @@ func main() {
 
 					log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
 
-
 				} else if url := strings.TrimPrefix(root, ">"); url != root {
 					url += req.URL.Path
 					if req.URL.RawQuery != "" {
-						url += "?"+req.URL.RawQuery
+						url += "?" + req.URL.RawQuery
 					}
 					//TODO: pass query string along with
 					log.Printf("Redirect: %s%s to %s", req.Host, req.URL.Path, url)

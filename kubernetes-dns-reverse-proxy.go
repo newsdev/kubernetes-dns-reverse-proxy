@@ -1,199 +1,68 @@
 package main
 
+// A reverse proxy to route incoming HTTP requests
+
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
-	"net/http/httputil"
-	"os"
-	"path"
-	"strings"
 	"time"
 
-	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
-	"github.com/newsdev/kubernetes-dns-reverse-proxy/httpwrapper"
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/reverseproxy"
 )
 
-var config struct {
-	address, statusAddress        string
-	domainSuffixes                string
-	routesFilename                string
-	concurrency, compressionLevel int
-	timeout                       time.Duration
-	validateRoutes                bool
-
-	kubernetes struct {
-		namespace, dnsDomain string
-	}
-
-	static, fallback struct {
-		enable             bool
-		scheme, host, path string
-	}
-}
+var config reverseproxy.Config
 
 func init() {
-	flag.StringVar(&config.address, "address", ":8080", "address to run the proxy server on")
-	flag.StringVar(&config.statusAddress, "status-address", ":8081", "address to run the status server on")
-	flag.StringVar(&config.domainSuffixes, "domain-suffixes", ".local", "domain suffixes")
-	flag.StringVar(&config.kubernetes.dnsDomain, "kubernetes-dns-domain", "cluster.local", "Kubernetes DNS domain")
-	flag.StringVar(&config.kubernetes.namespace, "kubernetes-namespace", "default", "Kubernetes namespace to server")
-	flag.BoolVar(&config.static.enable, "static", false, "enable static proxy")
-	flag.StringVar(&config.static.scheme, "static-scheme", "http", "static scheme")
-	flag.StringVar(&config.static.host, "static-host", "", "static host")
-	flag.StringVar(&config.static.path, "static-path", "/", "static path")
-	flag.BoolVar(&config.fallback.enable, "fallback", false, "enable fallback proxy")
-	flag.StringVar(&config.fallback.scheme, "fallback-scheme", "http", "fallback scheme")
-	flag.StringVar(&config.fallback.host, "fallback-host", "", "fallback host")
-	flag.StringVar(&config.fallback.path, "fallback-path", "/", "fallback path")
-	flag.StringVar(&config.routesFilename, "routes", "", "path to a routes file")
-	flag.BoolVar(&config.validateRoutes, "validate-routes", false, "validate routes file and exit")
-	flag.IntVar(&config.concurrency, "concurrency", 32, "concurrency per host")
-	flag.IntVar(&config.compressionLevel, "compression-level", 4, "gzip compression level (0 to disable)")
-	flag.DurationVar(&config.timeout, "timeout", time.Second, "dial timeout")
+	flag.StringVar(&config.Address, "address", ":8080", "address to run the proxy server on")
+	flag.StringVar(&config.StatusAddress, "status-address", ":8081", "address to run the status server on")
+	flag.StringVar(&config.DomainSuffixesRaw, "domain-suffixes", ".local", "domain suffixes")
+	flag.StringVar(&config.Kubernetes.DNSDomain, "kubernetes-dns-domain", "cluster.local", "Kubernetes DNS domain")
+	flag.StringVar(&config.Kubernetes.Namespace, "kubernetes-namespace", "default", "Kubernetes namespace to server")
+	flag.BoolVar(&config.Static.Enable, "static", false, "enable static proxy")
+	flag.StringVar(&config.Static.Scheme, "static-scheme", "http", "static scheme")
+	flag.StringVar(&config.Static.Host, "static-host", "", "static host")
+	flag.StringVar(&config.Static.Path, "static-path", "/", "static path")
+	flag.BoolVar(&config.Fallback.Enable, "fallback", false, "enable fallback proxy")
+	flag.StringVar(&config.Fallback.Scheme, "fallback-scheme", "http", "fallback scheme")
+	flag.StringVar(&config.Fallback.Host, "fallback-host", "", "fallback host")
+	flag.StringVar(&config.Fallback.Path, "fallback-path", "/", "fallback path")
+	flag.StringVar(&config.RoutesFilename, "routes", "", "path to a routes file")
+	flag.BoolVar(&config.ValidateRoutes, "validate-routes", false, "validate routes file and exit")
+	flag.IntVar(&config.Concurrency, "concurrency", 32, "concurrency per host")
+	flag.IntVar(&config.CompressionLevel, "compression-level", 4, "gzip compression level (0 to disable)")
+	flag.DurationVar(&config.Timeout, "timeout", time.Second, "dial timeout")
 }
 
 func main() {
 	flag.Parse()
 
 	// Set domain suffixes based on the config.
-	domainSuffixes := strings.Split(config.domainSuffixes, ",")
+	domainSuffixes := config.DomainSuffixes()
 	log.Println("domain suffixes:", domainSuffixes)
 
 	// Set the kubernetes suffix based on the config.
-	kubernetesSuffix := fmt.Sprintf(".%s.%s", config.kubernetes.namespace, config.kubernetes.dnsDomain)
+	kubernetesSuffix := fmt.Sprintf(".%s.%s", config.Kubernetes.Namespace, config.Kubernetes.DNSDomain)
 	log.Println("kubernetes suffix:", kubernetesSuffix)
 
-	// Create a new director object.
-	d := director.NewDirector()
-
-	// Check for a routes JSON file.
-	if config.validateRoutes || config.routesFilename != "" {
-
-		routesFile, err := os.Open(config.routesFilename)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		routesJSON, err := ioutil.ReadAll(routesFile)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if err := routesFile.Close(); err != nil {
-			log.Fatal(err)
-		}
-
-		var routes map[string]map[string]string
-		if err := json.Unmarshal(routesJSON, &routes); err != nil {
-			log.Fatal(err)
-		}
-
-		for domain, prefixMap := range routes {
-			for prefix, service := range prefixMap {
-				d.SetService(domain, prefix, service)
-			}
-		}
-
-		log.Println("routes are valid!")
-		if config.validateRoutes {
-			return
-		}
+	reverseProxy, err := reverseproxy.NewReverseProxy(&config)
+	if err != nil {
+		log.Fatal("Unable to instantiate reverse proxy:", err)
 	}
 
-	// Build the reverse proxy HTTP handler.
-	reverseProxy := &httputil.ReverseProxy{
-		// Specify a custom transport which rate limits requests and compresses responses.
-		Transport: &httpwrapper.Transport{
-			MaxConcurrencyPerHost: config.concurrency,
-			CompressionLevel:      config.compressionLevel,
-			Transport: &http.Transport{
-				MaxIdleConnsPerHost: config.concurrency,
-				Dial: func(network, addr string) (net.Conn, error) {
-					return net.DialTimeout(network, addr, config.timeout)
-				},
-			},
-		},
-		// The Director has the opportunity to modify the HTTP request before it
-		// is handed off to the Transport.
-		Director: func(req *http.Request) {
-
-			// Drop the connection header to ensure keepalives are maintained.
-			req.Header.Del("connection")
-
-			// Check if the request is for a default domain-based service routing
-			// i.e. http://{servicename}.{domain-suffix}/
-			for _, domainSuffix := range domainSuffixes {
-				if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
-					req.URL.Scheme = "http"
-					req.URL.Host = root + kubernetesSuffix
-					log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
-					return
-				}
-			}
-
-			// Then, try the director.
-
-			if root, err := d.Service(req.Host, req.URL.Path); err != nil {
-				// The director didn't find a match, handle it gracefully.
-
-				if err != director.NoMatchingServiceError {
-
-					log.Println("Error:", req.Host, req.URL.Path, err)
-				} else {
-
-					// Send traffic to the fallback.
-					if config.fallback.enable {
-
-						// Set the URL scheme, host, and path.
-						req.URL.Scheme = config.fallback.scheme
-						req.URL.Host = config.fallback.host
-						req.URL.Path = path.Join(config.fallback.path, req.URL.Path)
-
-						log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
-					}
-				}
-
-			} else {
-				// The director found a match.
-
-				if config.static.enable && strings.HasPrefix(root, "/") {
-					// Handle static file requests.
-
-					// Set the URL scheme, host, and path.
-					req.URL.Scheme = config.static.scheme
-					req.URL.Host = config.static.host
-					req.URL.Path = path.Join(config.static.path, root, req.URL.Path)
-
-					// Set the request host (used as the "Host" header value).
-					req.Host = config.static.host
-
-					// Drop cookies given that the response should not vary.
-					req.Header.Del("cookie")
-
-					log.Println("Static:", req.Host, req.URL.Path, "to", req.URL.Host)
-				} else {
-					// Handle an arbitrary URL routing to a service.
-
-					req.URL.Scheme = "http"
-					req.URL.Host = root + kubernetesSuffix
-					log.Println("Proxy:", req.Host, req.URL.Path, "to", req.URL.Host)
-				}
-			}
-		},
+	log.Println("routes are valid!")
+	if config.ValidateRoutes {
+		return
 	}
 
 	reverseProxyServer := &http.Server{
-		Addr:    config.address,
+		Addr:    config.Address,
 		Handler: reverseProxy,
 	}
 
 	statusServer := &http.Server{
-		Addr: config.statusAddress,
+		Addr: config.StatusAddress,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "ok")
 		}),
@@ -203,12 +72,12 @@ func main() {
 	errs := make(chan error)
 
 	go func() {
-		log.Println("starting server on", config.address)
+		log.Println("starting server on", config.Address)
 		errs <- reverseProxyServer.ListenAndServe()
 	}()
 
 	go func() {
-		log.Println("starting status server on", config.statusAddress)
+		log.Println("starting status server on", config.StatusAddress)
 		errs <- statusServer.ListenAndServe()
 	}()
 

@@ -59,7 +59,7 @@ Possible patterns are as follows.
 There's a shell script to get a local server running. First set up your `$GOPATH`, then clone the repo into `$GOPATH/src/github.com/newsdev/kubernetes-dns-reverse-proxy`
 
 ```
-export $GOPATH=~/gocode
+export GOPATH=~/gocode
 cd $GOPATH
 mkdir -p src/github.com/newsdev/
 cd src/github.com/newsdev

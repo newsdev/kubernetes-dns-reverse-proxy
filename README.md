@@ -60,9 +60,8 @@ There's a shell script to get a local server running. First set up your `$GOPATH
 
 ```
 export GOPATH=~/gocode
-cd $GOPATH
-mkdir -p src/github.com/newsdev/
-cd src/github.com/newsdev
+mkdir -p $GOPATH/src/github.com/newsdev/
+cd $GOPATH/src/github.com/newsdev
 git clone git@github.com:newsdev/kubernetes-dns-reverse-proxy.git
 cd kubernetes-dns-reverse-proxy
 ./test/demo.sh

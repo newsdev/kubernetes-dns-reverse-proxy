@@ -18,7 +18,7 @@ type givenReverseProxyRequests struct {
 func TestRouter(t *testing.T) {
 	tests := []struct {
 		givenRoutesJSON string
-		given           RouterConfig
+		given           Config
 		givenRequests   []givenReverseProxyRequests
 	}{
 		{
@@ -27,7 +27,7 @@ func TestRouter(t *testing.T) {
 					"/": "cats"
 				}
 			}`,
-			RouterConfig{
+			Config{
 				"",
 				"",
 				"",

@@ -76,7 +76,9 @@ Try [http://www.127.0.0.1.xip.io:8080/projects/app2](http://www.127.0.0.1.xip.io
 
 #### How to run test suite
 
-TK
+```
+go test ./...
+```
 
 #### Performance benchmarking
 

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/handlers"
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/accesslog"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/httpwrapper"
 )
@@ -121,9 +121,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 
 	return &http.Server{
 			Addr: config.Address,
-
-			// TODO: this log format needs hostname added to it
-			Handler: handlers.CombinedLoggingHandler(
+			Handler: accesslog.CustomLoggingHandler(
 				os.Stdout, 
 				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					// Drop the connection header to ensure keepalives are maintained.
@@ -141,7 +139,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 									req.URL.Scheme = "http"
 									req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-									log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
+									// log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
 									reverseProxy.ServeHTTP(w, req)
 									return
 								}
@@ -155,7 +153,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								req.URL.Host = config.Fallback.Host
 								req.URL.Path = path.Join(config.Fallback.Path, req.URL.Path)
 
-								log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
+								// log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
 							} else {
 								log.Println("Error: no route matched and fallback not enabled for", req.Host, req.URL.Path)
 							}
@@ -191,7 +189,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 							req.URL.Scheme = config.Static.Scheme
 							req.URL.Host = config.Static.Host
 
-							log.Println("Path: ", req.URL.Path)
+							// log.Println("Path: ", req.URL.Path)
 							trailing := strings.HasSuffix(req.URL.Path, "/")
 
 							req.URL.Path = path.Join(config.Static.Path, root, req.URL.Path)
@@ -205,7 +203,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 							// Drop cookies given that the response should not vary.
 							req.Header.Del("cookie")
 
-							log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
+							// log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
 
 						} else if url := strings.TrimPrefix(root, ">"); url != root {
 							url += req.URL.Path
@@ -221,7 +219,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 
 							req.URL.Scheme = "http"
 							req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-							log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
+							// log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
 						}
 					}
 

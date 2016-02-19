@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/accesslog"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/httpwrapper"
 )
@@ -120,108 +121,111 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 
 	return &http.Server{
 			Addr: config.Address,
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				// Drop the connection header to ensure keepalives are maintained.
-				req.Header.Del("connection")
+			Handler: accesslog.CustomLoggingHandler(
+				os.Stdout, 
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					// Drop the connection header to ensure keepalives are maintained.
+					req.Header.Del("connection")
 
-				if root, err := dir.Service(req.Host, req.URL.Path); err != nil {
-					// The director didn't find a match, handle it gracefully.
+					if root, err := dir.Service(req.Host, req.URL.Path); err != nil {
+						// The director didn't find a match, handle it gracefully.
 
-					if err != director.NoMatchingServiceError {
-						log.Println("Error:", req.Host, req.URL.Path, err)
-					} else {
+						if err != director.NoMatchingServiceError {
+							log.Println("Error:", req.Host, req.URL.Path, err)
+						} else {
 
-						// If NoMatchingServiceError is thrown, check against the domain suffixes, e.g. {service}.local
-						for _, domainSuffix := range config.DomainSuffixes() {
-							if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
-								req.URL.Scheme = "http"
-								req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-								log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
-								reverseProxy.ServeHTTP(w, req)
-								return
+							// If NoMatchingServiceError is thrown, check against the domain suffixes, e.g. {service}.local
+							for _, domainSuffix := range config.DomainSuffixes() {
+								if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
+									req.URL.Scheme = "http"
+									req.URL.Host = root + config.KubernetesServiceDomainSuffix()
+									// log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
+									reverseProxy.ServeHTTP(w, req)
+									return
+								}
 							}
+
+							// Otherwise, send traffic to the fallback.
+							if config.Fallback.Enable {
+
+								// Set the URL scheme, host, and path.
+								req.URL.Scheme = config.Fallback.Scheme
+								req.URL.Host = config.Fallback.Host
+								req.URL.Path = path.Join(config.Fallback.Path, req.URL.Path)
+
+								// log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
+							} else {
+								log.Println("Error: no route matched and fallback not enabled for", req.Host, req.URL.Path)
+							}
+
 						}
 
-						// Otherwise, send traffic to the fallback.
-						if config.Fallback.Enable {
+					} else {
+						// The director found a match.
+
+						if config.Static.Enable && strings.HasPrefix(root, "/") {
+							// Handle static file requests.
+
+							// we need to modify response
+							// with equivalent of nginx
+							// proxy_redirect /<%= application.name %>/ /;
+							// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_redirect
+							// // Sets the text that should be changed in the “Location” and “Refresh” header
+							// // fields of a proxied server response.
+							// Otherwise, AWS returned redirects will have wrong paths
+							//
+							// for example
+							// curl -v http://well.127.0.0.1.xip.io:8080/projects/workouts
+							// Location: /well_workout/projects/workouts/
+							// needs to get rewritten to
+							// Location: /projects/workouts/
+							// so
+							// here we set headers so that
+							// in httpwrapper.Transport.RoundTrip we know what's needed to  be replaced
+							req.Header.Add("x-static-root", path.Join(config.Static.Path, root)+"/")
+							req.Header.Add("x-original-url", req.Host+req.URL.String())
 
 							// Set the URL scheme, host, and path.
-							req.URL.Scheme = config.Fallback.Scheme
-							req.URL.Host = config.Fallback.Host
-							req.URL.Path = path.Join(config.Fallback.Path, req.URL.Path)
+							req.URL.Scheme = config.Static.Scheme
+							req.URL.Host = config.Static.Host
 
-							log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
+							// log.Println("Path: ", req.URL.Path)
+							trailing := strings.HasSuffix(req.URL.Path, "/")
+
+							req.URL.Path = path.Join(config.Static.Path, root, req.URL.Path)
+							if trailing && !strings.HasSuffix(req.URL.Path, "/") {
+								req.URL.Path += "/"
+							}
+
+							// Set the request host (used as the "Host" header value).
+							req.Host = config.Static.Host
+
+							// Drop cookies given that the response should not vary.
+							req.Header.Del("cookie")
+
+							// log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
+
+						} else if url := strings.TrimPrefix(root, ">"); url != root {
+							url += req.URL.Path
+							if req.URL.RawQuery != "" {
+								url += "?" + req.URL.RawQuery
+							}
+							//TODO: pass query string along with
+							log.Printf("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
+							http.Redirect(w, req, url, 301)
+							return
 						} else {
-							log.Println("Error: no route matched and fallback not enabled for", req.Host, req.URL.Path)
-						}
+							// Handle an arbitrary URL routing to a service.
 
+							req.URL.Scheme = "http"
+							req.URL.Host = root + config.KubernetesServiceDomainSuffix()
+							// log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
+						}
 					}
 
-				} else {
-					// The director found a match.
-
-					if config.Static.Enable && strings.HasPrefix(root, "/") {
-						// Handle static file requests.
-
-						// we need to modify response
-						// with equivalent of nginx
-						// proxy_redirect /<%= application.name %>/ /;
-						// http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_redirect
-						// // Sets the text that should be changed in the “Location” and “Refresh” header
-						// // fields of a proxied server response.
-						// Otherwise, AWS returned redirects will have wrong paths
-						//
-						// for example
-						// curl -v http://well.127.0.0.1.xip.io:8080/projects/workouts
-						// Location: /well_workout/projects/workouts/
-						// needs to get rewritten to
-						// Location: /projects/workouts/
-						// so
-						// here we set headers so that
-						// in httpwrapper.Transport.RoundTrip we know what's needed to  be replaced
-						req.Header.Add("x-static-root", path.Join(config.Static.Path, root)+"/")
-						req.Header.Add("x-original-url", req.Host+req.URL.String())
-
-						// Set the URL scheme, host, and path.
-						req.URL.Scheme = config.Static.Scheme
-						req.URL.Host = config.Static.Host
-
-						log.Println("Path: ", req.URL.Path)
-						trailing := strings.HasSuffix(req.URL.Path, "/")
-
-						req.URL.Path = path.Join(config.Static.Path, root, req.URL.Path)
-						if trailing && !strings.HasSuffix(req.URL.Path, "/") {
-							req.URL.Path += "/"
-						}
-
-						// Set the request host (used as the "Host" header value).
-						req.Host = config.Static.Host
-
-						// Drop cookies given that the response should not vary.
-						req.Header.Del("cookie")
-
-						log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
-
-					} else if url := strings.TrimPrefix(root, ">"); url != root {
-						url += req.URL.Path
-						if req.URL.RawQuery != "" {
-							url += "?" + req.URL.RawQuery
-						}
-						//TODO: pass query string along with
-						log.Printf("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
-						http.Redirect(w, req, url, 301)
-						return
-					} else {
-						// Handle an arbitrary URL routing to a service.
-
-						req.URL.Scheme = "http"
-						req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-						log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
-					}
-				}
-
-				reverseProxy.ServeHTTP(w, req)
-			}),
+					reverseProxy.ServeHTTP(w, req)
+				}),
+			),
 		},
 		nil
 }

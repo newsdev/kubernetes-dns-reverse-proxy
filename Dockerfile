@@ -1,4 +1,4 @@
-FROM golang:1.5.2
+FROM golang:1.7
 
 # Add a system-user for the Go application.
 RUN adduser --system golang-app

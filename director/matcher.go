@@ -50,6 +50,9 @@ func (m *Matcher) SetPrefix(prefix, value string) {
 
 func (m *Matcher) Match(path string) (string, error) {
 
+	// TODO:
+	// match with regex
+
 	// The list of path prefixes is in reverse order by string length. We want
 	// to return the first (most specific) match we come accross.
 	for _, prefix := range m.prefixesList {

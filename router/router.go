@@ -12,6 +12,7 @@ import (
 	"path"
 	"strings"
 	"time"
+	"context"
 
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/accesslog"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
@@ -107,7 +108,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 			CompressionLevel:      config.CompressionLevel,
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: config.Concurrency,
-				Dial: func(network, addr string) (net.Conn, error) {
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 					return net.DialTimeout(network, addr, config.Timeout)
 				},
 			},
@@ -139,7 +140,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 									req.URL.Scheme = "http"
 									req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-									// log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
+									log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
 									reverseProxy.ServeHTTP(w, req)
 									return
 								}
@@ -153,7 +154,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								req.URL.Host = config.Fallback.Host
 								req.URL.Path = path.Join(config.Fallback.Path, req.URL.Path)
 
-								// log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
+								log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
 							} else {
 								log.Println("Error: no route matched and fallback not enabled for", req.Host, req.URL.Path)
 							}
@@ -219,7 +220,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 
 							req.URL.Scheme = "http"
 							req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-							// log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
+							log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
 						}
 					}
 

@@ -34,7 +34,7 @@ func TestRouter(t *testing.T) {
 				"",
 				32,
 				4,
-				time.Second,
+				time.Minute,
 				false,
 				KubernetesConfig{
 					"default",

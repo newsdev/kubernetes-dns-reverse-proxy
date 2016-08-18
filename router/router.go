@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
+	// "net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"path"
 	"strings"
 	"time"
-	"context"
+	// "context"
 
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/accesslog"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
@@ -108,9 +108,14 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 			CompressionLevel:      config.CompressionLevel,
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: config.Concurrency,
-				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-					return net.DialTimeout(network, addr, config.Timeout)
-				},
+				// DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+
+				// 	// TODO:
+				// 	// resolve timeouts here
+
+				// 	return net.DialTimeout(network, addr, config.Timeout)
+				// 	// return net.Dial(network, addr)
+				// },
 			},
 		},
 		// The Director has the opportunity to modify the HTTP request before it
@@ -140,7 +145,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 									req.URL.Scheme = "http"
 									req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-									log.Println("Domain Suffix Match:", req.Host, req.URL.Path)
+									log.Println("Domain Suffix Match:", req.Host, req.URL.Host, req.URL.Path)
 									reverseProxy.ServeHTTP(w, req)
 									return
 								}

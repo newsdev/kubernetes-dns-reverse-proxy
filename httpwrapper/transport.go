@@ -6,7 +6,7 @@ package httpwrapper
 import (
 	"compress/gzip"
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net/http"
 	"strings"
 	"sync"
@@ -59,7 +59,7 @@ type Transport struct {
 
 func closeLogError(c io.Closer) {
 	if err := c.Close(); err != nil {
-		log.Println(err)
+		log.Errorln(err)
 	}
 }
 
@@ -80,14 +80,14 @@ func compressResponse(resp *http.Response, compressionLevel int) error {
 		// and defer its closing.
 		gzipWriter, err := gzip.NewWriterLevel(pipeWriter, compressionLevel)
 		if err != nil {
-			log.Println(err)
+			log.Errorln(err)
 			return
 		}
 		defer closeLogError(gzipWriter)
 
 		// Copy the response body to the gzip writer.
 		if _, err := io.Copy(gzipWriter, r); err != nil {
-			log.Println(err)
+			log.Errorln(err)
 		}
 	}(resp.Body)
 
@@ -188,10 +188,10 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if staticRoot != "" {
 		if s3Location != "" {
 			resp.Header.Set("Location", strings.Replace(s3Location, staticRoot, "/", 1))
-			log.Println("Location translated:", resp.Header.Get("Location"))
+			log.Debugln("Location translated:", resp.Header.Get("Location"))
 		} else if s3Refresh != "" {
 			resp.Header.Set("Refresh", strings.Replace(s3Refresh, staticRoot, "/", 1))
-			log.Println("Refresh translated:", resp.Header.Get("Refresh"))
+			log.Debugln("Refresh translated:", resp.Header.Get("Refresh"))
 		}
 	}
 

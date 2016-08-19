@@ -36,6 +36,7 @@ func TestRouter(t *testing.T) {
 				4,
 				time.Minute,
 				false,
+				false,
 				KubernetesConfig{
 					"default",
 					"svc.cluster.local",

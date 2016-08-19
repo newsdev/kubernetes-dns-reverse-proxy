@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
+
+	"os"
+	log "github.com/Sirupsen/logrus"
 
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/router"
 )
@@ -32,18 +34,26 @@ func init() {
 	flag.IntVar(&config.Concurrency, "concurrency", 32, "concurrency per host")
 	flag.IntVar(&config.CompressionLevel, "compression-level", 4, "gzip compression level (0 to disable)")
 	flag.DurationVar(&config.Timeout, "timeout", time.Second, "dial timeout")
+	flag.BoolVar(&config.Verbose, "verbose", false, "verbose logging")
+
+	log.SetOutput(os.Stdout)
 }
 
 func main() {
 	// Parse command-line flags into the router config object.
 	flag.Parse()
 
+	if config.Verbose {
+		log.SetLevel(log.DebugLevel)
+		log.Debugln("verbose mode: now seeing debug logs")
+	}
+
 	mainServer, err := router.NewKubernetesRouter(&config)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("routes are valid!")
+	log.Infoln("routes are valid!")
 	if config.ValidateRoutes {
 		return
 	}
@@ -59,12 +69,12 @@ func main() {
 	errs := make(chan error)
 
 	go func() {
-		log.Println("starting server on", config.Address)
+		log.Infoln("starting server on", config.Address)
 		errs <- mainServer.ListenAndServe()
 	}()
 
 	go func() {
-		log.Println("starting status server on", config.StatusAddress)
+		log.Infoln("starting status server on", config.StatusAddress)
 		errs <- statusServer.ListenAndServe()
 	}()
 

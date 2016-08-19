@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
-	// "net"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"path"
 	"strings"
 	"time"
-	// "context"
+	"context"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/accesslog"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/httpwrapper"
@@ -27,6 +27,7 @@ type Config struct {
 	Concurrency, CompressionLevel int
 	Timeout                       time.Duration
 	ValidateRoutes                bool
+	Verbose                       bool
 
 	Kubernetes KubernetesConfig
 
@@ -65,8 +66,8 @@ func (c *Config) KubernetesServiceDomainSuffix() string {
 // NewKubernetesRouter gives you a router instance.
 func NewKubernetesRouter(config *Config) (*http.Server, error) {
 
-	log.Println("Domain suffixes:", config.DomainSuffixes())
-	log.Println("Kubernetes service domain suffix:", config.KubernetesServiceDomainSuffix())
+	log.Infoln("Domain suffixes:", config.DomainSuffixes())
+	log.Infoln("Kubernetes service domain suffix:", config.KubernetesServiceDomainSuffix())
 
 	// Create a new director object.
 	dir := director.NewDirector()
@@ -132,7 +133,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 						// The director didn't find a match, handle it gracefully.
 
 						if err != director.NoMatchingServiceError {
-							log.Println("Error:", req.Host, req.URL.Path, err)
+							log.Errorln("Error:", req.Host, req.URL.Path, err)
 						} else {
 
 							// If NoMatchingServiceError is thrown, check against the domain suffixes, e.g. {service}.local
@@ -140,7 +141,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								if root := strings.TrimSuffix(req.Host, domainSuffix); root != req.Host {
 									req.URL.Scheme = "http"
 									req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-									log.Println("Domain Suffix Match:", req.Host, req.URL.Host, req.URL.Path)
+									log.Debug("Domain Suffix Match:", req.Host, req.URL.Host, req.URL.Path)
 									reverseProxy.ServeHTTP(w, req)
 									return
 								}
@@ -154,9 +155,9 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								req.URL.Host = config.Fallback.Host
 								req.URL.Path = path.Join(config.Fallback.Path, req.URL.Path)
 
-								log.Println("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
+								log.Debug("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
 							} else {
-								log.Println("Error: no route matched and fallback not enabled for", req.Host, req.URL.Path)
+								log.Errorln("No route matched and fallback not enabled for", req.Host, req.URL.Path)
 							}
 
 						}
@@ -190,7 +191,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 							req.URL.Scheme = config.Static.Scheme
 							req.URL.Host = config.Static.Host
 
-							// log.Println("Path: ", req.URL.Path)
+							log.Debugln("Path: ", req.URL.Path)
 							trailing := strings.HasSuffix(req.URL.Path, "/")
 
 							req.URL.Path = path.Join(config.Static.Path, root, req.URL.Path)
@@ -204,7 +205,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 							// Drop cookies given that the response should not vary.
 							req.Header.Del("cookie")
 
-							// log.Println("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
+							log.Debugln("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
 
 						} else if url := strings.TrimPrefix(root, ">"); url != root {
 							url += req.URL.Path
@@ -212,7 +213,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								url += "?" + req.URL.RawQuery
 							}
 							//TODO: pass query string along with
-							log.Printf("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
+							log.Debug("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
 							http.Redirect(w, req, url, 301)
 							return
 						} else {
@@ -220,7 +221,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 
 							req.URL.Scheme = "http"
 							req.URL.Host = root + config.KubernetesServiceDomainSuffix()
-							log.Println("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
+							log.Debugln("Proxy:", req.Host+req.URL.Path, "to", req.URL.Host)
 						}
 					}
 

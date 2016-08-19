@@ -108,14 +108,9 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 			CompressionLevel:      config.CompressionLevel,
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: config.Concurrency,
-				// DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-
-				// 	// TODO:
-				// 	// resolve timeouts here
-
-				// 	return net.DialTimeout(network, addr, config.Timeout)
-				// 	// return net.Dial(network, addr)
-				// },
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return net.DialTimeout(network, addr, config.Timeout)
+				},
 			},
 		},
 		// The Director has the opportunity to modify the HTTP request before it

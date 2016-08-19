@@ -1,4 +1,4 @@
-FROM golang:1.5.2
+FROM golang:1.7
 
 # Add a system-user for the Go application.
 RUN adduser --system golang-app
@@ -7,6 +7,7 @@ RUN adduser --system golang-app
 ENV GO15VENDOREXPERIMENT=1
 ADD . $GOPATH/src/github.com/newsdev/kubernetes-dns-reverse-proxy
 WORKDIR $GOPATH/src/github.com/newsdev/kubernetes-dns-reverse-proxy
+RUN go get ./...
 RUN go install .
 
 # Run as the system-user.

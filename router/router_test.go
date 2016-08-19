@@ -34,11 +34,12 @@ func TestRouter(t *testing.T) {
 				"",
 				32,
 				4,
-				time.Second,
+				time.Minute,
+				false,
 				false,
 				KubernetesConfig{
 					"default",
-					"cluster.local",
+					"svc.cluster.local",
 				},
 				StaticBackendConfig{
 					false,
@@ -56,12 +57,12 @@ func TestRouter(t *testing.T) {
 			[]givenReverseProxyRequests{
 				givenReverseProxyRequests{
 					"http://www.cats.com/tabby",
-					"cats.default.cluster.local",
+					"cats.default.svc.cluster.local",
 					http.Header{},
 				},
 				givenReverseProxyRequests{
 					"http://www.cats.com/tabby",
-					"cats.default.cluster.local",
+					"cats.default.svc.cluster.local",
 					http.Header{},
 				},
 			},

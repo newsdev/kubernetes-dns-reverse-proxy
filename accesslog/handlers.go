@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"time"
 	"unicode/utf8"
-	// "log"
 )
 
 // combinedLoggingHandler is the http.Handler implementation for LoggingHandlerTo
@@ -45,7 +44,6 @@ func (h customLoggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	t := time.Now()
 	logger := makeLogger(w)
 	url := *req.URL
-	// log.Println(req.URL.IsAbs(), req.Host, req.URL.String())
 	originalHost := req.Host
 	h.handler.ServeHTTP(logger, req)
 	writeCustomLog(h.writer, req, url, t, logger.Status(), logger.Size(), originalHost)

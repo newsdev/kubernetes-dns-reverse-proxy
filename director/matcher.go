@@ -3,6 +3,8 @@ package director
 import (
 	"errors"
 	"strings"
+
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/datadog"
 )
 
 var (
@@ -61,5 +63,6 @@ func (m *Matcher) Match(path string) (string, error) {
 		}
 	}
 
+	datadog.Count("no_matching_prefix_error", 1, nil, 1.0)
 	return "", noMatchingPrefixError
 }

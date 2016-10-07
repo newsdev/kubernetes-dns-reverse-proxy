@@ -1,0 +1,24 @@
+{
+	"ImportPath": "github.com/newsdev/kubernetes-dns-reverse-proxy",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v74",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/DataDog/datadog-go/statsd",
+			"Comment": "1.0.0",
+			"Rev": "909c02b65dd8a52e8fa6072db9752a112227cf21"
+		},
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.10.0-38-g3ec0642",
+			"Rev": "3ec0642a7fb6488f65b06f9040adc67e3990296a"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9"
+		}
+	]
+}

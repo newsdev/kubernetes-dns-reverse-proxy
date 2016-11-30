@@ -34,6 +34,8 @@ Itself runs as a container within a kubernetes cluster with the path to the conf
 
 `--timeout` dial timeout.
 
+To log stats to Datadog, set the `DD_AGENT_SERVICE_HOST_PORT` environment variable.
+
 ### Routes Syntax
 
 The `routes.json` file is a JSON object with hostnames as top-level keys. Each hostname references an object with path prefixes as keys. Each path prefix is a key to a pattern.

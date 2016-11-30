@@ -48,7 +48,7 @@ func (m *Matcher) SetPrefix(prefix, value string) {
 	m.prefixes[prefix] = value
 }
 
-func (m *Matcher) Match(path string) (string, error) {
+func (m *Matcher) Match(path string) (string, string, error) {
 
 	// TODO:
 	// match with regex
@@ -57,9 +57,9 @@ func (m *Matcher) Match(path string) (string, error) {
 	// to return the first (most specific) match we come accross.
 	for _, prefix := range m.prefixesList {
 		if strings.HasPrefix(path, prefix) {
-			return m.prefixes[prefix], nil
+			return m.prefixes[prefix], prefix, nil
 		}
 	}
 
-	return "", noMatchingPrefixError
+	return "", "", noMatchingPrefixError
 }

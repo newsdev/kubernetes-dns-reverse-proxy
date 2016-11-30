@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/url"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -129,7 +130,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 					// Drop the connection header to ensure keepalives are maintained.
 					req.Header.Del("connection")
 
-					if root, err := dir.Service(req.Host, req.URL.Path); err != nil {
+					if root, prefix, err := dir.Service(req.Host, req.URL.Path); err != nil {
 						// The director didn't find a match, handle it gracefully.
 
 						if err != director.NoMatchingServiceError {
@@ -207,14 +208,18 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 
 							log.Debugln("Static:", req.Header.Get("x-original-url"), "to", req.URL.Host+req.URL.Path)
 
-						} else if url := strings.TrimPrefix(root, ">"); url != root {
-							url += req.URL.Path
-							if req.URL.RawQuery != "" {
-								url += "?" + req.URL.RawQuery
+						} else if redirectURLString := strings.TrimPrefix(root, ">"); redirectURLString != root {
+							// log.Println("Path:", req.URL.Path)
+							redirectURL, err := url.Parse(redirectURLString)
+							if err != nil {
+								log.Error(err)
 							}
-							//TODO: pass query string along with
-							log.Debug("Redirect: %s%s to %s", req.Host, req.URL.Path, url)
-							http.Redirect(w, req, url, 301)
+							redirectURL.Path = path.Join(redirectURL.Path, strings.Replace(req.URL.Path, prefix, "/", 1))
+							if req.URL.RawQuery != "" {
+								redirectURL.RawQuery = req.URL.RawQuery
+							}
+							log.Debug("Redirect: %s%s to %s", req.Host, req.URL.Path, redirectURL.String())
+							http.Redirect(w, req, redirectURL.String(), 301)
 							return
 						} else {
 							// Handle an arbitrary URL routing to a service.

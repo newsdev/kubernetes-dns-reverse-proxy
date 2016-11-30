@@ -29,11 +29,11 @@ func (d *Director) SetService(domain, prefix, service string) {
 	matcher.SetPrefix(prefix, service)
 }
 
-func (d *Director) Service(domain, path string) (string, error) {
+func (d *Director) Service(domain, path string) (string, string, error) {
 
 	matcher, ok := d.domains[domain]
 	if !ok {
-		return "", NoMatchingServiceError
+		return "", "", NoMatchingServiceError
 	}
 
 	return matcher.Match(path)

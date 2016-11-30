@@ -18,6 +18,8 @@ import (
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/accesslog"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/director"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/httpwrapper"
+
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/datadog"
 )
 
 // Config is a configuration data structure for the router.
@@ -125,7 +127,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 	return &http.Server{
 			Addr: config.Address,
 			Handler: accesslog.CustomLoggingHandler(
-				os.Stdout, 
+				os.Stdout,
 				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					// Drop the connection header to ensure keepalives are maintained.
 					req.Header.Del("connection")
@@ -155,7 +157,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								req.URL.Scheme = config.Fallback.Scheme
 								req.URL.Host = config.Fallback.Host
 								req.URL.Path = path.Join(config.Fallback.Path, req.URL.Path)
-
+								datadog.Count("fallback", 1, nil, 1.0)
 								log.Debug("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
 							} else {
 								log.Errorln("No route matched and fallback not enabled for", req.Host, req.URL.Path)
@@ -218,6 +220,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 							if req.URL.RawQuery != "" {
 								redirectURL.RawQuery = req.URL.RawQuery
 							}
+							datadog.Count("redirect_301", 1, nil, 1.0)
 							log.Debug("Redirect: %s%s to %s", req.Host, req.URL.Path, redirectURL.String())
 							http.Redirect(w, req, redirectURL.String(), 301)
 							return

@@ -53,6 +53,16 @@ Possible patterns are as follows.
 | `myservice` | Routed to a kubernetes service | "myservice" routed to `myservice.<kubernetes-namespace>.<kubernetes-dns-domain>` |
 | `/static_dir`  | Routed to a static host like S3 | "/static_dir" routed to `<static-host>/<static-path>/request_path` |
 
+### How to update dependencies
+
+```
+rm -Rf ./Godeps
+rm -Rf ./vendor
+go get ./...
+go get -u ./...
+godep save ./...
+godep update ./...
+```
 
 ### How to run the demo
 
@@ -82,5 +92,4 @@ go test ./...
 
 #### Performance benchmarking
 
-TK 
-
+TK

@@ -2,6 +2,8 @@ package director
 
 import (
 	"errors"
+
+	"github.com/newsdev/kubernetes-dns-reverse-proxy/datadog"
 )
 
 var (
@@ -33,6 +35,7 @@ func (d *Director) Service(domain, path string) (string, string, error) {
 
 	matcher, ok := d.domains[domain]
 	if !ok {
+		datadog.Count("no_matching_service_error", 1, nil, 1.0)
 		return "", "", NoMatchingServiceError
 	}
 

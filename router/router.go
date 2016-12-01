@@ -112,6 +112,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 			CompressionLevel:      config.CompressionLevel,
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: config.Concurrency,
+				DisableKeepAlives: true,
 				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 					return net.DialTimeout(network, addr, config.Timeout)
 				},

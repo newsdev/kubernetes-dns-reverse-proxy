@@ -1,18 +1,18 @@
 package router
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/url"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path"
 	"strings"
 	"time"
-	"context"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/newsdev/kubernetes-dns-reverse-proxy/accesslog"
@@ -112,7 +112,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 			CompressionLevel:      config.CompressionLevel,
 			Transport: &http.Transport{
 				MaxIdleConnsPerHost: config.Concurrency,
-				DisableKeepAlives: true,
+				DisableKeepAlives:   true,
 				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 					return net.DialTimeout(network, addr, config.Timeout)
 				},
@@ -161,6 +161,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								datadog.Count("fallback", 1, nil, 1.0)
 								log.Debug("Fallback:", req.Host, req.URL.Path, " to ", req.URL.Host)
 							} else {
+								datadog.Count("no_route_matched_no_fallback_enabled", 1, nil, 1.0)
 								log.Errorln("No route matched and fallback not enabled for", req.Host, req.URL.Path)
 							}
 

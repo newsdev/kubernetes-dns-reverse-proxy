@@ -159,7 +159,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 								req.URL.Host = config.Fallback.Host
 								req.URL.Path = path.Join(config.Fallback.Path, req.URL.Path)
 								datadog.Count("fallback", 1, nil, 1.0)
-								log.Debug("Fallback:", req.Host, req.URL.Path, "to", req.URL.Host)
+								log.Debug("Fallback:", req.Host, req.URL.Path, " to ", req.URL.Host)
 							} else {
 								log.Errorln("No route matched and fallback not enabled for", req.Host, req.URL.Path)
 							}

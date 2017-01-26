@@ -189,7 +189,7 @@ func NewKubernetesRouter(config *Config) (*http.Server, error) {
 							// so
 							// here we set headers so that
 							// in httpwrapper.Transport.RoundTrip we know what's needed to  be replaced
-							req.Header.Add("x-static-root", path.Join(config.Static.Host, config.Static.Path, root)+"/")
+							req.Header.Add("x-static-root", path.Join(config.Static.Path, root)+"/")
 							req.Header.Add("x-original-url", req.Host+req.URL.String())
 
 							// Set the URL scheme, host, and path.

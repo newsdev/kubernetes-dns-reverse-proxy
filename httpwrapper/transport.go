@@ -5,11 +5,12 @@ package httpwrapper
 
 import (
 	"compress/gzip"
-	log "github.com/Sirupsen/logrus"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -187,8 +188,18 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	s3Refresh := resp.Header.Get("Refresh")
 	if staticRoot != "" {
 		if s3Location != "" {
+			setLocation := s3Location
+			if true == strings.HasPrefix(s3Location, staticRoot) {
+				setLocation = strings.Replace(s3Location, staticRoot, "/", 1)
+			}
+			resp.Header.Set("Location", setLocation)
 			log.Debugln("Location translated:", resp.Header.Get("Location"))
 		} else if s3Refresh != "" {
+			setRefresh := s3Refresh
+			if true == strings.HasPrefix(s3Refresh, staticRoot) {
+				setRefresh = strings.Replace(s3Refresh, staticRoot, "/", 1)
+			}
+			resp.Header.Set("Refresh", setRefresh)
 			log.Debugln("Refresh translated:", resp.Header.Get("Refresh"))
 		}
 	}
